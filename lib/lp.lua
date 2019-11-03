@@ -3,12 +3,12 @@
 -- Top button row is column 10 
 -- Partial compatibility with Grids API
 local version = include('lunchpaid/lib/version')
+
 local lp = { 
     version = version,
     midi_id = nil
 }
 
-local is_connect_handled = false
 local og_dev_add, og_dev_remove
 
 -- TODO: support multiple devices
@@ -25,19 +25,16 @@ function lp.find_midi_device_id()
 end
 
 function lp.connect(dummy_id)
-    -- For some reason set_handler has to be done 
-    -- here and not during module initialization
-    if not is_connect_handled then
-        setup_connect_handling()
-        is_connect_handled = true
-    end
-
-    lp.update_devices()
-
+    lp.set_midi_handler()
     return lp
 end
 
-function setup_connect_handling()
+function lp.set_key_handler(key_handler)
+    lp.set_midi_handler()
+    lp.key = key_handler
+end
+
+function lp.setup_connect_handling()
     og_dev_add = midi.add
     og_dev_remove = midi.remove
 
@@ -54,9 +51,9 @@ function lp.handle_dev_add(id, name, dev)
 
     lp.update_devices()
 
-    if lp.name_matches(name) then
+    if (lp.name_matches(name)) and (id ~= lp.midi_id) then
         lp.midi_id = id
-        lp.set_handler()
+        lp.set_midi_handler()
     end
 end
 
@@ -65,19 +62,21 @@ function lp.handle_dev_remove(id)
     lp.update_devices()
 end
 
-
-function lp.set_handler()
+function lp.set_midi_handler()
     if lp.midi_id == nil then
-        return false
+        return
     end
 
-    midi.devices[lp.midi_id].event = handle_key_midi
-    return true
+    if midi.devices[lp.midi_id] ~= nil then
+        midi.devices[lp.midi_id].event = lp.handle_key_midi
+    else
+        lp.midi_id = nil
+    end
 end
 
 -- Accept MIDI event and trigger key event, 
 -- i.e. "convert" / pass-through
-function handle_key_midi(event)
+function lp.handle_key_midi(event)
     local x, y, z
 
     if event[1] == 0x90 then
@@ -91,8 +90,6 @@ function handle_key_midi(event)
 
     if lp.key ~= nil then 
         lp.key(lp.midi_id, x, y, z)
-    else
-        print("no key handler")
     end
 end
 
@@ -104,7 +101,6 @@ function lp:led(x, y, z)
     end
 
     local event = {}
-    event[3] = ((z << 2) & 0x30) | (z & 0x03) 
 
     if x == 10 then
         event[1] = 0xB0
@@ -113,6 +109,8 @@ function lp:led(x, y, z)
         event[1] = 0x90
         event[2] = ((y-1) << 4) | (x-1)
     end
+
+    event[3] = ((z << 2) & 0x30) | (z & 0x03) 
 
     midi.devices[lp.midi_id]:send(event)
 end
@@ -148,11 +146,18 @@ end
 function lp.update_devices() 
     midi.update_devices()
 
-    lp.midi_id = lp.find_midi_device_id()
-    return lp.set_handler()
+    local new_id = lp.find_midi_device_id()
+
+    -- Only set id/handler when helpful
+    if (lp.midi_id ~= new_id) and (new_id ~= nil) then
+        lp.midi_id = new_id
+        return lp.set_midi_handler()
+    end
+
+    return (lp.midi_id ~= nil)
 end
 
+lp.setup_connect_handling()
 lp.update_devices()
-lp.cleanup()
 
 return lp

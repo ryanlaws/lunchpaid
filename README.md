@@ -1,3 +1,12 @@
+# JUST USE [midigrid](https://github.com/miker2049/midigrid).
+Folks have been doing some good work over at the 
+[midigrid repo](https://github.com/miker2049/midigrid).
+I recommend using this since it is in active development by a handful of
+people, it supports more devices, and is just generally more future-proof. It
+also uses some of the same code as this repo (with my blessing). As far as
+I can tell, the only thing this lib has that it doesn't is the deliciously
+snarky name.
+
 # Lunchpaid
 Implements some of the Grid API for versions of the Novation Launchpad that
 only have buttons and red and green LEDs. To be more Grid-like, the top row
